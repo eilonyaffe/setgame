@@ -31,9 +31,9 @@ public class Table {
     protected final Integer[] cardToSlot; // slot per card (if any)
 
     /**
-     * a list of lists, each represents a slot. made to avoid locking the entire table
+     * a list of threadsafeLists, each represents a slot. made to avoid locking the entire table
      */
-    protected ArrayList<ArrayList<Integer>> slots; //NEW
+    protected ArrayList<ThreadSafeList> slots; //NEW
 
     /**
      * Constructor for testing.
@@ -46,9 +46,9 @@ public class Table {
         this.env = env;
         this.slotToCard = slotToCard;
         this.cardToSlot = cardToSlot;
-        this.slots = new ArrayList<ArrayList<Integer>>(12);
+        this.slots = new ArrayList<ThreadSafeList>(12);
         for (int i = 0; i < slots.size(); i++) {
-            slots.add(new ArrayList<>(env.config.players));
+            slots.add(new ThreadSafeList());
         }
     }
 
@@ -63,10 +63,10 @@ public class Table {
     }
 
         /**
-     * returns the required slot, in the form of arraylist, synchronized to make this acess thread safe
+     * returns the required slot, in the form of arraylist.
      * @param slot - the slot in which the card should be placed.
      */
-    public synchronized ArrayList<Integer> getSlot(int slot){ //EYTODO NEW
+    public ThreadSafeList getSlot(int slot){ //EYTODO NEW
         return this.slots.get(slot-5);
     }
 
@@ -108,13 +108,11 @@ public class Table {
             Thread.sleep(env.config.tableDelayMillis);
         } catch (InterruptedException ignored) {}
 
-        ArrayList<Integer> currSlot = this.getSlot(slot);
-        synchronized(currSlot){
-            cardToSlot[card] = slot;
-            slotToCard[slot] = card;
-            env.ui.placeCard(card,slot);
-        }
-        //EYTODO not sure what else needed to add.
+        cardToSlot[card] = slot;
+        slotToCard[slot] = card;
+        env.ui.placeCard(card,slot);
+        
+        //EYTODO not sure what else needed to add. needs to make sure thread safe
     }
 
     /**
@@ -126,11 +124,9 @@ public class Table {
             Thread.sleep(env.config.tableDelayMillis);
         } catch (InterruptedException ignored) {}
 
-        ArrayList<Integer> currSlot = this.getSlot(slot);
-        synchronized(currSlot){
-            env.ui.removeCard(slot);
-        }
-        //EYTODO not sure what else needed to add. maybe also return token to player if had token? better to do from dealer
+        env.ui.removeCard(slot);
+        
+        //EYTODO not sure what else needed to add. maybe also return token to player if had token? better to do from dealer needs to make sure thread safe
     }
 
     /**
@@ -140,11 +136,9 @@ public class Table {
      */
     public void placeToken(int player, int slot) {
         // EYTODO implement
-        ArrayList<Integer> currSlot = this.getSlot(slot);
-        synchronized(currSlot){
-            currSlot.add(player, 1);
-            env.ui.placeToken(player, slot);
-        }
+        ThreadSafeList currSlot = this.getSlot(slot);
+        currSlot.add(player);
+        env.ui.placeToken(player, slot); //TODO maybe should be inside ThreadSafeList method of add
     }
 
     /**
@@ -155,13 +149,13 @@ public class Table {
      */
     public boolean removeToken(int player, int slot) {
         // EYTODO implement
-        ArrayList<Integer> currSlot = this.getSlot(slot);
-        synchronized(currSlot){
-            if(currSlot.get(player)==null || currSlot.get(player)==0)
-                return false;
-            currSlot.set(player, 0);
-            env.ui.removeToken(player, slot);
+        ThreadSafeList currSlot = this.getSlot(slot);
+        boolean ans =  currSlot.remove(player);
+        if(ans){
+            env.ui.removeToken(player, slot); //TODO maybe should be inside ThreadSafeList method of remove
             return true;
         }
+        return false;
     }
 }
+
