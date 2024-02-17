@@ -2,9 +2,7 @@ package bguspl.set.ex;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 
 import bguspl.set.Env;
 
@@ -36,6 +34,26 @@ public class Player implements Runnable {
      */
     private Thread playerThread;
 
+        /**
+     * The thread representing the current player.
+     */
+    protected BoundedQueue<Integer> commandsQueue;
+
+    /**
+     * The number of tokens the player can still place.
+     */
+    protected int tokensLeft;
+
+    /**
+     * The status of the player. 1=playing. 2=waiting for dealer response. 3=failed to make set, needs to remove tokens
+     */
+    protected int status;
+
+    /**
+     * the tokens the human player had placed
+     */
+    protected boolean[] placed_tokens;
+
     /**
      * The thread of the AI (computer) player (an additional thread used to generate key presses).
      */
@@ -56,10 +74,7 @@ public class Player implements Runnable {
      */
     private int score;
 
-        /**
-     * The current score of the player.
-     */
-    private BoundedQueue<Integer> commandsQueue; //NEW
+
 
     /**
      * The class constructor.
@@ -75,6 +90,10 @@ public class Player implements Runnable {
         this.table = table;
         this.id = id;
         this.human = human;
+        this.commandsQueue = new BoundedQueue<Integer>();
+        this.tokensLeft = 3;
+        this.status = 1;
+        this.placed_tokens = new boolean[12];
     }
 
     /**
@@ -84,11 +103,35 @@ public class Player implements Runnable {
     public void run() {
         playerThread = Thread.currentThread();
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
-        this.commandsQueue = new BoundedQueue<>();
         if (!human) createArtificialIntelligence();
 
         while (!terminate) {
             // TODO implement main player loop
+            while(!commandsQueue.isEmpty()){
+                if(this.status==1){
+                    int slotCommand = commandsQueue.remove();
+                    if(this.placed_tokens[slotCommand-5]==true){ //means he wishes to remove a token
+                        this.table.removeToken(this.id, slotCommand);
+                        this.placed_tokens[slotCommand-5]=false;
+                        this.tokensLeft++;
+                    }
+                    else if(this.placed_tokens[slotCommand-5]==false){ //means he wishes to place a token
+                        this.table.placeToken(this.id, slotCommand);
+                        this.placed_tokens[slotCommand-5]=true;
+                        this.tokensLeft--;
+                        if(tokensLeft==0) this.status=2; //TODO add calling to the dealer to check if made set
+                    }
+                }
+
+                else if(this.status==3){ //means there's a token removal command in the queue
+                    int slotCommand = commandsQueue.remove();    
+                    this.table.removeToken(this.id, slotCommand);
+                    this.placed_tokens[slotCommand-5]=false;
+                    this.tokensLeft++;
+                    this.status = 1; //returns to play normally
+                }
+            }
+
         }
         if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
@@ -105,16 +148,20 @@ public class Player implements Runnable {
             ArrayList<Integer> slotsGenerator = new ArrayList<Integer>();
             for (int i=5; i<17; i++) 
                 slotsGenerator.add(i);
+
             while (!terminate) {
                 // TODO implement player key press simulator
-                Collections.shuffle(slotsGenerator);
-                for(int j=0;j<3;j++){
-                    this.commandsQueue.add(slotsGenerator.get(j));
+                Collections.shuffle(slotsGenerator); 
+                for(int j=0;j<3;j++)
+                    this.commandsQueue.add(slotsGenerator.get(j)); //the random 3 key presses
+                while(!commandsQueue.isEmpty()){
+                    try {
+                        table.placeToken(this.id, commandsQueue.remove());
+                        this.tokensLeft--;
+                        Thread.sleep(4000); //EYTODO maybe change, now 4 seconds
+                    } catch (InterruptedException ignored) {}
                 }
-
-                try {
-                    synchronized (this) { wait(); }
-                } catch (InterruptedException ignored) {}
+                //EYTODO - need to check with the dealer if we found a set and act accordingly
             }
             env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
         }, "computer-" + id);
@@ -135,6 +182,16 @@ public class Player implements Runnable {
      */
     public void keyPressed(int slot) {
         // TODO implement
+        //EYTODO maybe have additions to a full queue be on wait until the queue is not full?
+        if(this.status==3 && this.placed_tokens[slot-5]==false){ //player has to only remove tokens now
+            //do nothing
+        }
+        else if(this.status==2){ //player awaits dealer's response
+            //do nothing //EYTODO maybe change?
+        }
+        else{
+            this.commandsQueue.add(slot);
+        }
     }
 
     /**
@@ -145,16 +202,24 @@ public class Player implements Runnable {
      */
     public void point() {
         // TODO implement
-
+        this.score++;
+        env.ui.setScore(this.id, score);
+        try {
+            Thread.sleep(2000); //EYTODO maybe change, now 2 seconds
+        } catch (InterruptedException ignored) {}
         int ignored = table.countCards(); // this part is just for demonstration in the unit tests
-        env.ui.setScore(id, ++score);
+         //eilon- changed to avoid double increasing, was: env.ui.setScore(id, ++score); in this exact line, moved to top
     }
 
     /**
      * Penalize a player and perform other related actions.
      */
     public void penalty() {
-        // TODO implement
+         // TODO implement //EYTODO maybe also reset the queue here?
+         env.ui.setFreeze(this.id, 5000); //EYTODO chech if works correctly
+         try {
+            Thread.sleep(5000); //EYTODO maybe change, now 5 seconds
+        } catch (InterruptedException ignored) {}
     }
 
     public int score() {
@@ -162,10 +227,9 @@ public class Player implements Runnable {
     }
 }
 
-class BoundedQueue<Integer> {
+class BoundedQueue<T> {
     List<Integer> lst;
     int capacity;
-
     BoundedQueue(){ this.capacity = 3; this.lst = new ArrayList<Integer>(); }
 
     public void add(Integer obj) {
@@ -173,11 +237,16 @@ class BoundedQueue<Integer> {
             lst.add(obj);
     }
 
-    public boolean remove() {
+    public Integer remove() {
+        Integer retValue = -1;
         if (lst.size() > 0){
-            lst.remove(0);
-            return true;
+            retValue = lst.remove(0);
+            return retValue;
         }
-        return false;
+        return retValue;
+    }
+
+    public boolean isEmpty() {
+        return lst.isEmpty();
     }
 }
