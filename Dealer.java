@@ -2,6 +2,7 @@ package bguspl.set.ex;
 
 import bguspl.set.Env;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -36,6 +37,11 @@ public class Dealer implements Runnable {
      * The time when the dealer needs to reshuffle the deck due to turn timeout.
      */
     private long reshuffleTime = Long.MAX_VALUE;
+
+        /**
+     * counter for elapsedTime
+     */
+    private int elaspedTime = 60000;
 
     public Dealer(Env env, Table table, Player[] players) {
         this.env = env;
@@ -91,21 +97,44 @@ public class Dealer implements Runnable {
     /**
      * Checks cards should be removed from the table and removes them.
      */
-    private void removeCardsFromTable() {
+    private void removeCardsFromTable() { //EYTODO think what cards should i remove. probably remove a set with 3 tokens. should be called when a player annouces he finished
         // TODO implement
     }
 
     /**
      * Check if any cards can be removed from the deck and placed on the table.
      */
-    private void placeCardsOnTable() {
+    private void placeCardsOnTable() { 
         // TODO implement
+        this.dealerShuffle();
+        while(!deck.isEmpty()){
+            for(int slot=0;slot<12;slot++){
+                if(table.slotToCard[slot]==null){
+                    table.placeCard(deck.remove(0), slot);
+                }
+            }
+            break;
+        }
+    }
+
+    /**
+     * shuffles the deck
+     */
+    private void dealerShuffle() { //EYTODO new
+        if(!deck.isEmpty()){
+            Collections.shuffle(deck); 
+        }
     }
 
     /**
      * Sleep for a fixed amount of time or until the thread is awakened for some purpose.
      */
     private void sleepUntilWokenOrTimeout() {
+        try {
+            elaspedTime = elaspedTime-1000;
+            Thread.sleep(1000); //EYTODO maybe change, now 1 seconds
+        } catch (InterruptedException ignored) {}
+
         // TODO implement
     }
 
@@ -113,6 +142,7 @@ public class Dealer implements Runnable {
      * Reset and/or update the countdown and the countdown display.
      */
     private void updateTimerDisplay(boolean reset) {
+        env.ui.setCountdown(elaspedTime, false);
         // TODO implement
     }
 
