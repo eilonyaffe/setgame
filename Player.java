@@ -94,6 +94,7 @@ public class Player implements Runnable {
         this.tokensLeft = 3;
         this.status = 1;
         this.placed_tokens = new boolean[12];
+        System.out.println("player created, id: " + id);
     }
 
     /**
@@ -110,28 +111,26 @@ public class Player implements Runnable {
             while(!commandsQueue.isEmpty()){
                 if(this.status==1){
                     int slotCommand = commandsQueue.remove();
-                    if(this.placed_tokens[slotCommand-5]==true){ //means he wishes to remove a token
+                    if(this.placed_tokens[slotCommand]==true){ //means he wishes to remove a token //was slotCommand-5
                         this.table.removeToken(this.id, slotCommand);
-                        this.placed_tokens[slotCommand-5]=false;
+                        this.placed_tokens[slotCommand]=false; //was slotCommand-5
                         this.tokensLeft++;
                     }
-                    else if(this.placed_tokens[slotCommand-5]==false){ //means he wishes to place a token
+                    else if(this.placed_tokens[slotCommand]==false){ //means he wishes to place a token //was slotCommand-5
                         this.table.placeToken(this.id, slotCommand);
-                        this.placed_tokens[slotCommand-5]=true;
+                        this.placed_tokens[slotCommand]=true; //was slotCommand-5
                         this.tokensLeft--;
                         if(tokensLeft==0) this.status=2; //TODO add calling to the dealer to check if made set
                     }
                 }
-
                 else if(this.status==3){ //means there's a token removal command in the queue
                     int slotCommand = commandsQueue.remove();    
                     this.table.removeToken(this.id, slotCommand);
-                    this.placed_tokens[slotCommand-5]=false;
+                    this.placed_tokens[slotCommand]=false; //was slotCommand-5
                     this.tokensLeft++;
                     this.status = 1; //returns to play normally
                 }
             }
-
         }
         if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
@@ -146,7 +145,7 @@ public class Player implements Runnable {
         aiThread = new Thread(() -> {
             env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
             ArrayList<Integer> slotsGenerator = new ArrayList<Integer>();
-            for (int i=5; i<17; i++) 
+            for (int i=0; i<12; i++) 
                 slotsGenerator.add(i);
 
             while (!terminate) {
@@ -183,7 +182,7 @@ public class Player implements Runnable {
     public void keyPressed(int slot) {
         // TODO implement
         //EYTODO maybe have additions to a full queue be on wait until the queue is not full?
-        if(this.status==3 && this.placed_tokens[slot-5]==false){ //player has to only remove tokens now
+        if(this.status==3 && this.placed_tokens[slot]==false){ //player has to only remove tokens now //was slotCommand-5
             //do nothing
         }
         else if(this.status==2){ //player awaits dealer's response
@@ -191,6 +190,7 @@ public class Player implements Runnable {
         }
         else{
             this.commandsQueue.add(slot);
+            System.out.println("slot pressed by player: "+ id + " is: "+slot);
         }
     }
 
