@@ -47,8 +47,8 @@ public class Table {
         this.slotToCard = slotToCard;
         this.cardToSlot = cardToSlot;
         this.slots = new ArrayList<ThreadSafeList>(12);
-        for (int i = 0; i < slots.size(); i++) {
-            slots.add(new ThreadSafeList());
+        for (int i = 0; i < 12; i++) {
+            slots.add(new ThreadSafeList(env,i));
         }
     }
 
@@ -67,7 +67,7 @@ public class Table {
      * @param slot - the slot in which the card should be placed.
      */
     public ThreadSafeList getSlot(int slot){ //EYTODO NEW
-        return this.slots.get(slot-5);
+        return this.slots.get(slot); //was slot-5
     }
 
     /**
@@ -111,7 +111,6 @@ public class Table {
         cardToSlot[card] = slot;
         slotToCard[slot] = card;
         env.ui.placeCard(card,slot);
-        
         //EYTODO not sure what else needed to add. needs to make sure thread safe
     }
 
@@ -123,9 +122,11 @@ public class Table {
         try {
             Thread.sleep(env.config.tableDelayMillis);
         } catch (InterruptedException ignored) {}
-
+        int card =  slotToCard[slot];
+        slotToCard[slot]=null;
+        cardToSlot[card]=null;
         env.ui.removeCard(slot);
-        
+        //EYTODO create designated function in threadsafelist, to make this removal also deal with the tokens that are on this slot
         //EYTODO not sure what else needed to add. maybe also return token to player if had token? better to do from dealer needs to make sure thread safe
     }
 
@@ -138,7 +139,6 @@ public class Table {
         // EYTODO implement
         ThreadSafeList currSlot = this.getSlot(slot);
         currSlot.add(player);
-        env.ui.placeToken(player, slot); //TODO maybe should be inside ThreadSafeList method of add
     }
 
     /**
@@ -151,11 +151,7 @@ public class Table {
         // EYTODO implement
         ThreadSafeList currSlot = this.getSlot(slot);
         boolean ans =  currSlot.remove(player);
-        if(ans){
-            env.ui.removeToken(player, slot); //TODO maybe should be inside ThreadSafeList method of remove
-            return true;
-        }
-        return false;
+        return ans;
     }
 }
 
