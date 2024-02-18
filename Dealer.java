@@ -1,6 +1,7 @@
 package bguspl.set.ex;
 
 import bguspl.set.Env;
+import bguspl.set.ThreadLogger;
 
 import java.util.Collections;
 import java.util.List;
@@ -39,9 +40,15 @@ public class Dealer implements Runnable {
     private long reshuffleTime = Long.MAX_VALUE;
 
         /**
-     * counter for elapsedTime
+     * The system time when starting the 60 seconds loop
      */
-    private int elaspedTime = 60000;
+    private long startTime = Long.MAX_VALUE;
+
+    /**
+     * The system time when starting the 60 seconds loop
+     */
+    private long timeElapsed = Long.MAX_VALUE;
+ 
 
     public Dealer(Env env, Table table, Player[] players) {
         this.env = env;
@@ -58,8 +65,9 @@ public class Dealer implements Runnable {
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
         while (!shouldFinish()) {
             placeCardsOnTable();
+            createAndRunPlayerThreads(); //EY new
             timerLoop();
-            updateTimerDisplay(false);
+            updateTimerDisplay(true); //EY i changed to true
             removeAllCardsFromTable();
         }
         announceWinners();
@@ -77,6 +85,18 @@ public class Dealer implements Runnable {
             placeCardsOnTable();
         }
     }
+
+    /**
+     * Creates and runs all player threads
+     */
+    private void createAndRunPlayerThreads() {
+        for (int i = 0; i < players.length; i++){
+            Player a = players[i];
+            Thread playerThread = new Thread(a);
+            playerThread.start();
+        }
+    }
+
 
     /**
      * Called when the game should be terminated.
@@ -130,20 +150,33 @@ public class Dealer implements Runnable {
      * Sleep for a fixed amount of time or until the thread is awakened for some purpose.
      */
     private void sleepUntilWokenOrTimeout() {
+        // TODO implement
+        if(this.startTime == Long.MAX_VALUE && this.reshuffleTime == Long.MAX_VALUE){
+            this.startTime = System.currentTimeMillis();
+            this.reshuffleTime = System.currentTimeMillis() + 60000; //EY: dont change!
+            this.timeElapsed = System.currentTimeMillis() + 60000;
+        }
+
         try {
-            elaspedTime = elaspedTime-1000;
             Thread.sleep(1000); //EYTODO maybe change, now 1 seconds
+            this.timeElapsed -= 1000;
         } catch (InterruptedException ignored) {}
 
-        // TODO implement
     }
 
     /**
      * Reset and/or update the countdown and the countdown display.
      */
     private void updateTimerDisplay(boolean reset) {
-        env.ui.setCountdown(elaspedTime, false);
         // TODO implement
+        if(reset){
+            this.startTime = Long.MAX_VALUE;
+            this.reshuffleTime = Long.MAX_VALUE;
+            this.timeElapsed = Long.MAX_VALUE;
+        }
+        else{
+            env.ui.setCountdown(timeElapsed-startTime, false);
+        }
     }
 
     /**
@@ -151,6 +184,13 @@ public class Dealer implements Runnable {
      */
     private void removeAllCardsFromTable() {
         // TODO implement
+        for(int slot=0;slot<12;slot++){
+                if(table.slotToCard[slot]!=null){
+                    deck.add(table.slotToCard[slot]);
+                    table.removeCard(slot);
+                }
+        }
+        // if(!terminate)
     }
 
     /**
