@@ -3,6 +3,7 @@ package bguspl.set.ex;
 import bguspl.set.Env;
 import bguspl.set.ThreadLogger;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -34,6 +35,7 @@ public class Dealer implements Runnable {
      */
     private volatile boolean terminate;
 
+
     /**
      * The time when the dealer needs to reshuffle the deck due to turn timeout.
      */
@@ -63,12 +65,17 @@ public class Dealer implements Runnable {
     @Override
     public void run() {
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
+        createAndRunPlayerThreads(); //EY new
+
         while (!shouldFinish()) {
             placeCardsOnTable();
-            createAndRunPlayerThreads(); //EY new
+            this.table.tableReady = true; //indicates player can start placing cards
+            this.table.hints(); //EYTODO delete later
             timerLoop();
             updateTimerDisplay(true); //EY i changed to true
             removeAllCardsFromTable();
+            this.table.tableReady = false;
+
         }
         announceWinners();
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
@@ -119,6 +126,37 @@ public class Dealer implements Runnable {
      */
     private void removeCardsFromTable() { //EYTODO think what cards should i remove. probably remove a set with 3 tokens. should be called when a player annouces he finished
         // TODO implement
+        if(!this.table.finishedPlayersCards.isEmpty()){
+            Link removedLink = this.table.finishedPlayersCards.removeFirst();
+            int[] cardsSet = removedLink.cards;
+            Player player = removedLink.player;
+            boolean success = this.env.util.testSet(cardsSet);
+            System.out.println("set made by player: "+player.id +" is: "+success);
+            if(success){
+                player.wasCorrect=1; //indicates the player thread to award itself
+
+                for(int card: cardsSet){
+                    int slot = this.table.cardToSlot[card];
+                    ThreadSafeList slotObj = this.table.getSlot(slot);
+                    int[] playersWithToken = slotObj.getPlayers();
+                    for(int playerToReturn : playersWithToken){ //first returning tokens to players
+                        Player currPlayer = this.players[playerToReturn];
+                        currPlayer.tokensLeft++;
+                        System.out.println("removed card from slot: "+ slot +" for player: "+currPlayer.id +" tokens left: "+currPlayer.tokensLeft);
+                        currPlayer.placed_tokens[slot]=false;
+                    }
+                    slotObj.removeAll();
+                    this.table.removeCard(slot);
+                }
+                // player.wasCorrect=1; //indicates the player thread to award itself //was here
+                this.updateTimerDisplay(true);
+            }
+            else{ 
+                player.wasCorrect=2; //indicates the player thread to penalize itself
+                
+            }
+            this.table.hints(); //EYTODO delete later 
+        }
     }
 
     /**
@@ -153,8 +191,8 @@ public class Dealer implements Runnable {
         // TODO implement
         if(this.startTime == Long.MAX_VALUE && this.reshuffleTime == Long.MAX_VALUE){
             this.startTime = System.currentTimeMillis();
-            this.reshuffleTime = System.currentTimeMillis() + 60000; //EY: dont change!
-            this.timeElapsed = System.currentTimeMillis() + 60000;
+            this.reshuffleTime = System.currentTimeMillis() + 61000; //EY: dont change!
+            this.timeElapsed = System.currentTimeMillis() + 61000;
         }
 
         try {
@@ -184,13 +222,23 @@ public class Dealer implements Runnable {
      */
     private void removeAllCardsFromTable() {
         // TODO implement
+        for(Player player:players){
+            player.status=2;
+            player.commandsQueue.Clear();
+            player.tokensLeft = 3;
+            player.placed_tokens = new boolean[12];
+        }
+        
         for(int slot=0;slot<12;slot++){
                 if(table.slotToCard[slot]!=null){
                     deck.add(table.slotToCard[slot]);
                     table.removeCard(slot);
                 }
         }
-        // if(!terminate)
+        this.table.removeAllTokens();
+        for(Player player: players){
+            player.status = 1;
+        }
     }
 
     /**
