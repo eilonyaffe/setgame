@@ -4,6 +4,7 @@ import bguspl.set.Env;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -36,6 +37,17 @@ public class Table {
     protected ArrayList<ThreadSafeList> slots; //NEW
 
     /**
+     * a queue of finished players by integers
+     */
+    protected LinkedList<Link> finishedPlayersCards; //EYTODO implement in the form of FIFO queue thread safe
+
+
+    /**
+     * The game environment object.
+     */
+    protected boolean tableReady;
+
+    /**
      * Constructor for testing.
      *
      * @param env        - the game environment objects.
@@ -50,6 +62,8 @@ public class Table {
         for (int i = 0; i < 12; i++) {
             slots.add(new ThreadSafeList(env,i));
         }
+        this.finishedPlayersCards = new LinkedList<Link>();
+        this.tableReady = false;
     }
 
     /**
@@ -153,5 +167,19 @@ public class Table {
         boolean ans =  currSlot.remove(player);
         return ans;
     }
+
+    public boolean removeAllTokens() { //EYTODO doesnt work well
+        // EYTODO implement
+        for (ThreadSafeList currSlot:this.slots){
+            currSlot.removeAll();
+        }
+        return false;
+    }
 }
+
+
+
+
+
+
 
