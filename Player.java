@@ -2,7 +2,6 @@ package bguspl.set.ex;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 
 import bguspl.set.Env;
 
@@ -49,6 +48,11 @@ public class Player implements Runnable {
      */
     protected int status;
 
+        /**
+     * indicates whether the player made a correct set or not. -1 is neither. 1 is correct, 2 is wrong
+     */
+    protected int wasCorrect;
+
     /**
      * the tokens the human player had placed
      */
@@ -94,6 +98,7 @@ public class Player implements Runnable {
         this.tokensLeft = 3;
         this.status = 1;
         this.placed_tokens = new boolean[12];
+        this.wasCorrect=-1;
         System.out.println("player created, id: " + id);
     }
 
@@ -108,32 +113,53 @@ public class Player implements Runnable {
 
         while (!terminate) {
             // TODO implement main player loop
-            while(!commandsQueue.isEmpty()){
+            while(!commandsQueue.lst.isEmpty()){
+                
+                int slotCommand = commandsQueue.lst.remove(0); //was  int slotCommand = commandsQueue.remove()
+                System.out.println("slot command from: "+this.id + " was: "+slotCommand);
                 if(this.status==1){
-                    int slotCommand = commandsQueue.remove();
                     if(this.placed_tokens[slotCommand]==true){ //means he wishes to remove a token //was slotCommand-5
                         this.table.removeToken(this.id, slotCommand);
                         this.placed_tokens[slotCommand]=false; //was slotCommand-5
                         this.tokensLeft++;
+
                     }
                     else if(this.placed_tokens[slotCommand]==false){ //means he wishes to place a token //was slotCommand-5
                         this.table.placeToken(this.id, slotCommand);
                         this.placed_tokens[slotCommand]=true; //was slotCommand-5
                         this.tokensLeft--;
-                        if(tokensLeft==0) this.status=2; //TODO add calling to the dealer to check if made set
-                    }
+
+                        if(tokensLeft==0){
+                            this.status=2; //TODO add calling to the dealer to check if made set
+                            this.sendSetCards();
+                            try {
+                                Thread.sleep(1000); //EYTODO maybe change, now 1 seconds
+                            } catch (InterruptedException ignored) {}
+                            if(this.wasCorrect==1){
+                                System.out.println("player: "+this.id +" was correct");
+                                this.point();
+                            }
+                            else if(this.wasCorrect==2){
+                                this.penalty();
+                            }
+                            else{
+                                System.out.println("was correct wasnt updated: "+this.wasCorrect);
+                            }
+                            }
+                        }
                 }
-                else if(this.status==3){ //means there's a token removal command in the queue
-                    int slotCommand = commandsQueue.remove();    
+                
+                else if(this.status==3){ //means there are only token removal commands in the queue
                     this.table.removeToken(this.id, slotCommand);
                     this.placed_tokens[slotCommand]=false; //was slotCommand-5
                     this.tokensLeft++;
                     this.status = 1; //returns to play normally
                 }
-            }
+            
         }
         if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
+    }
     }
 
     /**
@@ -175,6 +201,23 @@ public class Player implements Runnable {
     }
 
     /**
+     * creates the alleged set of cards that the player chose, and sends it to the table
+     */
+    public void sendSetCards() {
+        // EYTODO implement
+        int[] cards = new int[3];
+        int j=0;
+        for(int i=0;j<3 && i<this.placed_tokens.length;i++){
+            if(this.placed_tokens[i]==true){
+                cards[j] = table.slotToCard[i];
+                j++;
+            }
+        }
+        Link link = new Link(cards, this);
+        this.table.finishedPlayersCards.add(link); 
+    }
+
+    /**
      * This method is called when a key is pressed.
      *
      * @param slot - the slot corresponding to the key pressed.
@@ -189,8 +232,9 @@ public class Player implements Runnable {
             //do nothing //EYTODO maybe change?
         }
         else{
-            this.commandsQueue.add(slot);
-            System.out.println("slot pressed by player: "+ id + " is: "+slot);
+            if(this.table.tableReady)
+                this.commandsQueue.add(slot);
+            // System.out.println("slot pressed by player: "+ id + " is: "+slot);
         }
     }
 
@@ -204,9 +248,18 @@ public class Player implements Runnable {
         // TODO implement
         this.score++;
         env.ui.setScore(this.id, score);
+        this.commandsQueue.Clear();
+        this.placed_tokens = new boolean[12]; //resets the player's placed_tokens
+        this.status = 1; //indicates he resumes to play
+        this.wasCorrect=-1;
+
+        env.ui.setFreeze(this.id, 1000); //EYTODO chech if works correctly
         try {
-            Thread.sleep(2000); //EYTODO maybe change, now 2 seconds
+            Thread.sleep(1000); //EYTODO maybe change, now 1 seconds
         } catch (InterruptedException ignored) {}
+        env.ui.setFreeze(this.id, 0); //"unfreeze"
+        System.out.println("player status after point: "+status);
+
         int ignored = table.countCards(); // this part is just for demonstration in the unit tests
          //eilon- changed to avoid double increasing, was: env.ui.setScore(id, ++score); in this exact line, moved to top
     }
@@ -215,20 +268,30 @@ public class Player implements Runnable {
      * Penalize a player and perform other related actions.
      */
     public void penalty() {
-         // TODO implement //EYTODO maybe also reset the queue here?
-         env.ui.setFreeze(this.id, 5000); //EYTODO chech if works correctly
-         try {
-            Thread.sleep(5000); //EYTODO maybe change, now 5 seconds
-        } catch (InterruptedException ignored) {}
+         // TODO implement 
+         int freezeTime = 5000;
+         env.ui.setFreeze(this.id, freezeTime); //EYTODO chech if works correctly
+         for(int i=1;i<6;i++){
+            try {
+                Thread.sleep(1000); //EYTODO maybe change, now total 5 seconds
+            } catch (InterruptedException ignored) {}
+            env.ui.setFreeze(this.id, freezeTime-(i*1000)); //descending until unfrozen
+            this.commandsQueue.Clear();
+         }
+        this.status = 3;
+        this.wasCorrect=-1;
     }
 
+    /**
+     * Returns the player's score
+     */
     public int score() {
         return score;
     }
 }
 
 class BoundedQueue<T> {
-    List<Integer> lst;
+    ArrayList<Integer> lst;
     int capacity;
     BoundedQueue(){ this.capacity = 3; this.lst = new ArrayList<Integer>(); }
 
@@ -239,11 +302,15 @@ class BoundedQueue<T> {
 
     public Integer remove() {
         Integer retValue = -1;
-        if (lst.size() > 0){
+        if (!lst.isEmpty()){
             retValue = lst.remove(0);
             return retValue;
         }
         return retValue;
+    }
+
+    public void Clear() {
+        lst.clear();
     }
 
     public boolean isEmpty() {
