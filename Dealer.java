@@ -134,10 +134,10 @@ public class Dealer implements Runnable {
      */
     private void removeCardsFromTable() {
         // TODO implement
-        this.table.hints(); //EYTODO delete later
+        // this.table.hints(); //EYTODO delete later
 
         while(!this.table.finishedPlayerSets.isEmpty()){ //TODO was if(...). make sure it works. also was .isEmpty()
-            // System.out.println("linkedlist size: "+this.table.finishedPlayerSets.list.size());
+            long startTime = System.currentTimeMillis();   //HAZNEW     
             LinkPlayerSet removedLink = this.table.finishedPlayerSets.removeFirst(); //hazilon
             // System.out.println("checks set of player: "+removedLink.player.id);
 
@@ -190,6 +190,19 @@ public class Dealer implements Runnable {
                 // System.out.println("dealer did notifyall on lock");
             }
 
+            //from here HAZNEW
+            // long finishTime = System.currentTimeMillis();   //HAZNEW this
+            // if(this.timeElapsed!=Long.MAX_VALUE){ this
+            //     this.timeElapsed = this.timeElapsed - (finishTime - startTime); this
+            //     // if((timeElapsed-startTime) <= this.env.config.turnTimeoutWarningMillis){
+            //     //     env.ui.setCountdown(timeElapsed-startTime, true);
+            //     // }
+            //     // else{
+            //     //     env.ui.setCountdown(timeElapsed-startTime, false);
+            //     // }  
+            // }
+
+
         }
 
         // synchronized(this.table.playersLocker){
@@ -206,24 +219,12 @@ public class Dealer implements Runnable {
      * Check if any cards can be removed from the deck and placed on the table.
      */
     private void placeCardsOnTable() {
-        // TODO implement
-        // this.dealerShuffle();
-        // while(!deck.isEmpty()){
-        //     for(int slot=0;slot<12;slot++){
-        //         if(table.slotToCard[slot]==null){
-        //             table.placeCard(deck.remove(0), slot);
-        //         }
-        //     }
-        //     break;
-        // }
-
         this.dealerShuffle();
         for(int slot=0;slot<12 && !deck.isEmpty();slot++){
             if(table.slotToCard[slot]==null){
                 table.placeCard(deck.remove(0), slot);
             }
         }
-        
     }
 
     /**
@@ -247,8 +248,8 @@ public class Dealer implements Runnable {
         }
 
         try {
-            Thread.sleep(1000); //EYTODO maybe change, now 1 seconds
-            this.timeElapsed -= 1000;
+            Thread.sleep(100); //EYTODO maybe change, now 1 seconds
+            this.timeElapsed -= 100;
         } catch (InterruptedException ignored) {}
 
     }
@@ -263,12 +264,23 @@ public class Dealer implements Runnable {
             this.reshuffleTime = Long.MAX_VALUE;
             this.timeElapsed = Long.MAX_VALUE;
         }
+        // else{
+        //     if((timeElapsed-startTime) <= this.env.config.turnTimeoutWarningMillis){
+        //         env.ui.setCountdown(timeElapsed-startTime, true);
+        //     }
+        //     else{
+        //         env.ui.setCountdown(timeElapsed-startTime, false);
+        //     }
+        // }
+
         else{
-            if((timeElapsed-startTime) <= this.env.config.turnTimeoutWarningMillis){
-                env.ui.setCountdown(timeElapsed-startTime, true);
+            long timertry = reshuffleTime - System.currentTimeMillis();
+            System.out.println("timertry: "+timertry);
+            if((timertry) <= this.env.config.turnTimeoutWarningMillis){
+                env.ui.setCountdown(timertry, true);
             }
             else{
-                env.ui.setCountdown(timeElapsed-startTime, false);
+                env.ui.setCountdown(timertry, false);
             }
         }
         if(this.table.tableReady==false){
