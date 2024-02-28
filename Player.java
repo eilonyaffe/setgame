@@ -109,7 +109,7 @@ public class Player implements Runnable {
         this.status = 1; 
         this.placed_tokens = new boolean[12];
         this.wasCorrect = -1;
-        this.AIsleep = 3000;
+        this.AIsleep = 0;
         int[] cards = new int[3];
         this.playerSingleLink = new LinkPlayerSet(cards, this);
         System.out.println("player created, id: " + id); //TODO delete later
